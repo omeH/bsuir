@@ -370,7 +370,7 @@ def cmddelet(args):
 def cmdget(args):
     sock = args['sock']
     filename = args['data']
-    if args['data'] == 'retr':
+    if args['cmd'] == 'retr':
         cmdformat(args['len'], 2)
         getfile(sock, filename)
     else:
@@ -418,7 +418,7 @@ def workcycle(sock):
         'dele': cmddelet,
         'rmd':  cmdrmd,
         'rest': cmdget,
-        'rept': cmdget,
+        'retr': cmdget,
         'stor': cmdput,
         'help': cmdhelp,
         'quit': cmdquit
