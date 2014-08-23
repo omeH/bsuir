@@ -1,8 +1,10 @@
 #!/usr/bin/env python3.4
 
+import os
+import sys
 import socket
 
-from getaddr import getaddrclientint, getaddrclientext, getaddrserver
+from getaddr import getaddrserver
 from manftp import doc
 
 MAX_IBUF = 512
@@ -20,11 +22,9 @@ def readserv(sock, buf=MAX_IBUF):
     return sock.recv(buf).decode()[:-2]
 
 
-def com(count, command):
-    if count == 1:
-        return '{0} {1}{2}\r\n'.format(*command)
-    else:
-        return '{0} {1}/{2}\r\n'.format(*command)
+def com(*command):
+    full_name = os.path.join(*command[-2:])
+    return '{0} {1}\r\n'.format(command[0], full_name)
 
 
 def connectftp(addrftp):
@@ -199,9 +199,9 @@ def rmd(sock, directory):
         print('Error: func rmd')
 
 
-def delet(sock, file):
+def delet(sock, file_):
     directory = pwd(sock)
-    buf = com(len(directory), ('CWD', directory, file))
+    buf = com('CWD', directory, file_)
 
     sock.send(buf.encode())
     buf = readserv(sock)
@@ -209,7 +209,7 @@ def delet(sock, file):
         print('Error: func delete -> cwd <-')
         return
 
-    buf = com(len(directory), ('DELE', directory, file))
+    buf = com('DELE', directory, file_)
 
     sock.send(buf.encode())
     buf = readserv(sock)
@@ -232,9 +232,9 @@ def restfile(sock, r):
     return rest
 
 
-def getfile(sock_inc, file, rest=0, mod='wb'):
+def getfile(sock_inc, file_, rest=0, mod='wb'):
     directory = pwd(sock_inc)
-    buf = com(len(directory), ('CWD', directory, file))
+    buf = com('CWD', directory, file_)
 
     sock_inc.send(buf.encode())
     buf = readserv(sock_inc)
@@ -245,12 +245,12 @@ def getfile(sock_inc, file, rest=0, mod='wb'):
     typeftp(sock_inc)
     sock_new = activemode(sock_inc)
     if sock_new:
-        buf = com(len(directory), ('RETR', directory, file))
+        buf = com('RETR', directory, file_)
         sock_inc.send(buf.encode())
         buf = readserv(sock_inc)
         if not ('150' in buf):
             sock_new.close()
-            print('Error: file %s not found' % file)
+            print('Error: file %s not found' % file_)
             listdata(sock_inc)
             return
 
@@ -263,7 +263,7 @@ def getfile(sock_inc, file, rest=0, mod='wb'):
 
     sock_data, addr = sock_new.accept()
     sock_new.close()
-    f = open(file, mod)
+    f = open(file_, mod)
     if not f:
         return
 
@@ -277,19 +277,19 @@ def getfile(sock_inc, file, rest=0, mod='wb'):
     buf = readserv(sock_inc)
     if not ('226' in buf):
         sock_data.close()
-        print('Error: file %s is not transferred' % file)
+        print('Error: file %s is not transferred' % file_)
         return
 
     sock_data.close()
 
 
-def putfile(sock_inc, file):
+def putfile(sock_inc, file_):
     directory = pwd(sock_inc)
 
     typeftp(sock_inc)
     sock_new = activemode(sock_inc)
     if sock_new:
-        buf = com(len(directory), ('STOR', directory, file))
+        buf = com('STOR', directory, file_)
         sock_inc.send(buf.encode())
         buf = readserv(sock_inc)
         if not ('150' in buf):
@@ -301,9 +301,9 @@ def putfile(sock_inc, file):
     sock_new.close()
 
     try:
-        f = open(file, 'rb')
-    except FileNotFoundError:
-        print('Error: file %s not found' % file)
+        f = open(file_, 'rb')
+    except IOError:
+        print('Error: file %s not found' % file_)
         sock_data.close()
         buf = readserv(sock_inc)
         return
@@ -321,10 +321,11 @@ def putfile(sock_inc, file):
         print('Error: file not transfer')
         return
 
-    buf = com(len(directory), ('SITE CHMOD 644', directory, file))
-    sock_inc.send(buf.encode())
-    buf = readserv(sock_inc)
-    print(buf)
+    if not ('win' in sys.platform):
+        buf = com('SITE CHMOD 644', directory, file_)
+        sock_inc.send(buf.encode())
+        buf = readserv(sock_inc)
+        print(buf)
 
 
 def quitftp(sock):
@@ -424,7 +425,7 @@ def workcycle(sock):
         'quit': cmdquit
     }
     data = {'sock': sock}
-    while not 'closed' in sock.__repr__():
+    while not ('closed' in sock.__repr__()):
         cmd = input('> ftp# ').split(' ')
         data['cmd'] = cmd[0]
         data['len'] = len(cmd)
